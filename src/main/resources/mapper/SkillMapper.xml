@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cococlown.cococlawservice.mapper.SkillMapper">
+
+    <resultMap id="SkillDTOMap" type="com.cococlown.cococlawservice.dto.SkillDTO">
+        <id column="id" property="id"/>
+        <result column="name" property="name"/>
+        <result column="icon" property="icon"/>
+        <result column="icon_bg" property="iconBg"/>
+        <result column="short_desc" property="shortDesc"/>
+        <result column="description" property="description"/>
+        <result column="price" property="price"/>
+        <result column="original_price" property="originalPrice"/>
+        <result column="rating" property="rating"/>
+        <result column="sales" property="sales"/>
+        <result column="likes" property="likes"/>
+        <result column="category_id" property="categoryId"/>
+        <result column="category_name" property="categoryName"/>
+        <result column="security_level" property="securityLevel"/>
+        <result column="features" property="features"/>
+        <result column="usage" property="usage"/>
+        <result column="status" property="status"/>
+        <result column="featured" property="featured"/>
+    </resultMap>
+
+    <!-- 分页查询SKILL -->
+    <select id="selectSkillPage" resultMap="SkillDTOMap">
+        SELECT s.*, c.name as category_name
+        FROM skill s
+        LEFT JOIN category c ON s.category_id = c.id
+        <where>
+            <if test="query.categoryId != null">
+                AND s.category_id = #{query.categoryId}
+            </if>
+            <if test="query.keyword != null and query.keyword != ''">
+                AND (s.name LIKE CONCAT('%', #{query.keyword}, '%')
+                     OR s.short_desc LIKE CONCAT('%', #{query.keyword}, '%')
+                     OR s.description LIKE CONCAT('%', #{query.keyword}, '%'))
+            </if>
+            <if test="query.status != null">
+                AND s.status = #{query.status}
+            </if>
+            <if test="query.featured != null">
+                AND s.featured = #{query.featured}
+            </if>
+        </where>
+        ORDER BY s.sales DESC, s.rating DESC
+    </select>
+
+    <!-- 查询精选SKILL -->
+    <select id="selectFeaturedSkills" resultMap="SkillDTOMap">
+        SELECT s.*, c.name as category_name
+        FROM skill s
+        LEFT JOIN category c ON s.category_id = c.id
+        WHERE s.featured = 1 AND s.status = 1
+        ORDER BY s.rating DESC, s.sales DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 根据ID查询SKILL详情 -->
+    <select id="selectSkillDetailById" resultMap="SkillDTOMap">
+        SELECT s.*, c.name as category_name
+        FROM skill s
+        LEFT JOIN category c ON s.category_id = c.id
+        WHERE s.id = #{id}
+    </select>
+
+</mapper>
