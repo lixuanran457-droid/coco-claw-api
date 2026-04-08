@@ -89,6 +89,46 @@ public class JwtUtil {
         return generateToken(userId, username);
     }
 
+    // ==================== 管理员Token方法 ====================
+
+    /**
+     * 生成管理员Token
+     */
+    public String generateAdminToken(Long adminId, String username) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("adminId", adminId);
+        claims.put("username", username);
+        claims.put("type", "admin");
+
+        return Jwts.builder()
+                .claims(claims)
+                .subject(username)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + expiration))
+                .signWith(getSigningKey())
+                .compact();
+    }
+
+    /**
+     * 从管理员Token获取管理员ID
+     */
+    public Long getAdminIdFromToken(String token) {
+        Claims claims = parseClaims(token);
+        return claims.get("adminId", Long.class);
+    }
+
+    /**
+     * 验证是否为管理员Token
+     */
+    public boolean isAdminToken(String token) {
+        try {
+            Claims claims = parseClaims(token);
+            return "admin".equals(claims.get("type", String.class));
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private Claims parseClaims(String token) {
         return Jwts.parser()
                 .verifyWith(getSigningKey())

@@ -1,5 +1,6 @@
 package com.cococlown.cococlawservice.config;
 
+import com.cococlown.cococlawservice.filter.AdminJwtAuthenticationFilter;
 import com.cococlown.cococlawservice.filter.JwtAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -30,6 +31,9 @@ public class SecurityConfig {
     @Autowired
     private JwtAuthenticationFilter jwtAuthenticationFilter;
 
+    @Autowired
+    private AdminJwtAuthenticationFilter adminJwtAuthenticationFilter;
+
     /**
      * 密码加密器
      */
@@ -57,24 +61,36 @@ public class SecurityConfig {
             
             // 添加JWT认证过滤器
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(adminJwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
             
             // 配置请求授权
             .authorizeRequests()
                 // 公开接口：认证相关接口、Swagger文档、静态资源
                 .antMatchers(
                     "/api/auth/**",
+                    "/api/skills/**",
                     "/api/skill/**",
+                    "/api/categories/**",
+                    "/api/category/**",
+                    "/api/config/**",
+                    "/api/recommend/**",
                     "/api/payment/**",
                     "/api/orders/guest/**",
                     "/swagger-ui/**",
                     "/v2/api-docs/**",
                     "/swagger-resources/**",
                     "/webjars/**",
-                    "/favicon.ico"
+                    "/favicon.ico",
+                    "/api/dashboard/stats",
+                    "/api/dashboard/order-trend",
+                    "/api/dashboard/user-growth",
+                    "/api/dashboard/top-skills",
+                    "/api/dashboard/recent-orders"
                 ).permitAll()
                 
                 // 后台管理接口需要认证
                 .antMatchers("/api/admin/**").hasRole("ADMIN")
+                .antMatchers("/api/dashboard/**").hasRole("ADMIN")
                 
                 // 其他请求需要认证
                 .anyRequest().authenticated()

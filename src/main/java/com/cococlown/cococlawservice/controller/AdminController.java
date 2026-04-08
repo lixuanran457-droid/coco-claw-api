@@ -2,12 +2,16 @@ package com.cococlown.cococlawservice.controller;
 
 import com.cococlown.cococlawservice.common.Result;
 import com.cococlown.cococlawservice.entity.SysAdmin;
+import com.cococlown.cococlawservice.service.AdminAuthService;
 import com.cococlown.cococlawservice.service.AdminService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,14 +27,94 @@ public class AdminController {
     @Autowired
     private AdminService adminService;
 
+    @Autowired
+    private AdminAuthService adminAuthService;
+
     /**
-     * 获取所有管理员（后台管理）
+     * 管理员登录
+     */
+    @ApiOperation("管理员登录")
+    @PostMapping("/login")
+    public Result<Map<String, Object>> login(
+            @RequestBody Map<String, String> loginData,
+            HttpServletResponse response) {
+        String username = loginData.get("username");
+        String password = loginData.get("password");
+
+        try {
+            SysAdmin admin = adminAuthService.login(username, password);
+            String token = adminAuthService.generateToken(admin);
+
+            // 设置httpOnly Cookie
+            Cookie cookie = new Cookie("admin_token", token);
+            cookie.setHttpOnly(true);
+            cookie.setPath("/");
+            cookie.setMaxAge(86400); // 24小时
+            response.addCookie(cookie);
+
+            // 返回用户信息（不包含密码）
+            admin.setPassword(null);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("token", token);
+            result.put("user", admin);
+
+            return Result.success(result);
+        } catch (RuntimeException e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 管理员登出
+     */
+    @ApiOperation("管理员登出")
+    @PostMapping("/logout")
+    public Result<Void> logout(HttpServletRequest request, HttpServletResponse response) {
+        Cookie[] cookies = request.getCookies();
+        if (cookies != null) {
+            for (Cookie cookie : cookies) {
+                if ("admin_token".equals(cookie.getName())) {
+                    adminAuthService.logout(cookie.getValue());
+
+                    // 清除Cookie
+                    cookie.setMaxAge(0);
+                    cookie.setPath("/");
+                    response.addCookie(cookie);
+                    break;
+                }
+            }
+        }
+        return Result.success(null);
+    }
+
+    /**
+     * 获取当前管理员信息
+     */
+    @ApiOperation("获取当前管理员信息")
+    @GetMapping("/me")
+    public Result<SysAdmin> getCurrentAdmin(HttpServletRequest request) {
+        String token = getTokenFromCookie(request);
+        if (token == null) {
+            return Result.error(401, "请先登录");
+        }
+
+        SysAdmin admin = adminAuthService.verifyToken("Admin " + token);
+        if (admin == null) {
+            return Result.error(401, "登录已过期");
+        }
+
+        admin.setPassword(null);
+        return Result.success(admin);
+    }
+
+    /**
+     * 获取所有管理员
      */
     @ApiOperation("获取所有管理员")
     @GetMapping("/list")
     public Result<List<SysAdmin>> getAllAdmins() {
         List<SysAdmin> admins = adminService.getAllAdmins();
-        // 不返回密码
         for (SysAdmin admin : admins) {
             admin.setPassword(null);
         }
@@ -38,20 +122,20 @@ public class AdminController {
     }
 
     /**
-     * 获取管理员详情（后台管理）
+     * 获取管理员详情
      */
     @ApiOperation("获取管理员详情")
     @GetMapping("/{id}")
     public Result<SysAdmin> getAdminById(@PathVariable Long id) {
         SysAdmin admin = adminService.getAdminById(id);
         if (admin != null) {
-            admin.setPassword(null); // 不返回密码
+            admin.setPassword(null);
         }
         return Result.success(admin);
     }
 
     /**
-     * 创建管理员（后台管理）
+     * 创建管理员
      */
     @ApiOperation("创建管理员")
     @PostMapping
@@ -64,7 +148,7 @@ public class AdminController {
     }
 
     /**
-     * 更新管理员（后台管理）
+     * 更新管理员
      */
     @ApiOperation("更新管理员")
     @PutMapping("/{id}")
@@ -78,7 +162,7 @@ public class AdminController {
     }
 
     /**
-     * 删除管理员（后台管理）
+     * 删除管理员
      */
     @ApiOperation("删除管理员")
     @DeleteMapping("/{id}")
@@ -91,13 +175,13 @@ public class AdminController {
     }
 
     /**
-     * 重置密码（后台管理）
+     * 重置密码
      */
     @ApiOperation("重置密码")
     @PostMapping("/{id}/reset-password")
     public Result<Boolean> resetPassword(@PathVariable Long id, @RequestParam(required = false) String newPassword) {
         if (newPassword == null || newPassword.isEmpty()) {
-            newPassword = "admin123"; // 默认密码
+            newPassword = "admin123";
         }
         boolean success = adminService.resetPassword(id, newPassword);
         if (success) {
@@ -107,7 +191,7 @@ public class AdminController {
     }
 
     /**
-     * 更新管理员状态（后台管理）
+     * 更新管理员状态
      */
     @ApiOperation("更新管理员状态")
     @PutMapping("/{id}/status")
@@ -117,27 +201,6 @@ public class AdminController {
             return Result.success("状态更新成功", true);
         }
         return Result.error("状态更新失败");
-    }
-
-    /**
-     * 管理员登录
-     */
-    @ApiOperation("管理员登录")
-    @PostMapping("/login")
-    public Result<Map<String, Object>> login(@RequestBody Map<String, String> loginData) {
-        String username = loginData.get("username");
-        String password = loginData.get("password");
-        
-        SysAdmin admin = adminService.validateLogin(username, password);
-        if (admin != null) {
-            Map<String, Object> result = new HashMap<>();
-            result.put("id", admin.getId());
-            result.put("username", admin.getUsername());
-            result.put("role", admin.getRole());
-            result.put("status", admin.getStatus());
-            return Result.success("登录成功", result);
-        }
-        return Result.error("用户名或密码错误");
     }
 
     /**
@@ -153,5 +216,20 @@ public class AdminController {
             return Result.success("验证通过", true);
         }
         return Result.error("密码错误");
+    }
+
+    /**
+     * 从Cookie获取Token
+     */
+    private String getTokenFromCookie(HttpServletRequest request) {
+        Cookie[] cookies = request.getCookies();
+        if (cookies != null) {
+            for (Cookie cookie : cookies) {
+                if ("admin_token".equals(cookie.getName())) {
+                    return cookie.getValue();
+                }
+            }
+        }
+        return null;
     }
 }
