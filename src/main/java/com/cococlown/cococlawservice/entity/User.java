@@ -69,11 +69,6 @@ public class User implements Serializable {
     private String bio;
 
     /**
-     * 余额
-     */
-    private java.math.BigDecimal balance;
-
-    /**
      * 状态: 0-禁用, 1-启用
      */
     private Integer status;

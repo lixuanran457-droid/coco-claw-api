@@ -35,9 +35,9 @@ public class AuthResponseDTO implements Serializable {
     @Data
     public static class UserInfoDTO implements Serializable {
         private Long id;
-        private String username;
-        private String phone;
+        private String nickname;
         private String email;
+        private String avatar;
         private Integer status;
     }
 }

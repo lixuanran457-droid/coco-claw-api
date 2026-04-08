@@ -213,4 +213,44 @@ public class OrderController {
             return Result.error(e.getMessage());
         }
     }
+
+    // ==================== 游客订单查询 ====================
+
+    /**
+     * 游客：发送查单验证码
+     */
+    @ApiOperation("游客：发送查单验证码")
+    @PostMapping("/guest/send-captcha")
+    public Result<String> sendGuestQueryCaptcha(@RequestParam String email) {
+        try {
+            orderService.sendGuestQueryCaptcha(email);
+            return Result.success("验证码已发送", null);
+        } catch (RuntimeException e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 游客：通过邮箱查询订单
+     */
+    @ApiOperation("游客：查询订单")
+    @GetMapping("/guest/list")
+    public Result<IPage<OrderDTO>> getGuestOrderList(
+            @RequestParam String email,
+            @RequestParam String captcha,
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "10") Integer pageSize,
+            @RequestParam(required = false) Integer status) {
+        try {
+            OrderQueryDTO query = new OrderQueryDTO();
+            query.setPage(page);
+            query.setPageSize(pageSize);
+            query.setStatus(status);
+
+            IPage<OrderDTO> result = orderService.getGuestOrderPage(email, captcha, query);
+            return Result.success(result);
+        } catch (RuntimeException e) {
+            return Result.error(e.getMessage());
+        }
+    }
 }

@@ -25,9 +25,14 @@ public class Order implements Serializable {
     private Long id;
 
     /**
-     * 用户ID
+     * 用户ID（会员下单时必填，游客下单时为NULL）
      */
     private Long userId;
+
+    /**
+     * 游客邮箱（游客下单时必填，用于查询订单）
+     */
+    private String email;
 
     /**
      * 订单编号
@@ -80,7 +85,7 @@ public class Order implements Serializable {
     private BigDecimal payAmount;
 
     /**
-     * 支付方式: alipay, wechat, balance
+     * 支付方式: alipay, wechat
      */
     private String paymentMethod;
 

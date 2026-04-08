@@ -65,4 +65,16 @@ public interface OrderService {
      * 后台：处理退款
      */
     boolean processRefund(Long orderId);
+
+    // ==================== 游客订单查询 ====================
+
+    /**
+     * 游客：发送查询验证码到邮箱
+     */
+    void sendGuestQueryCaptcha(String email);
+
+    /**
+     * 游客：通过邮箱查询订单
+     */
+    IPage<OrderDTO> getGuestOrderPage(String email, String captcha, OrderQueryDTO query);
 }

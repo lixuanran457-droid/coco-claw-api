@@ -1,9 +1,7 @@
 package com.cococlown.cococlawservice.controller;
 
 import com.cococlown.cococlawservice.common.Result;
-import com.cococlown.cococlawservice.dto.AuthResponseDTO;
-import com.cococlown.cococlawservice.dto.LoginDTO;
-import com.cococlown.cococlawservice.dto.RegisterDTO;
+import com.cococlown.cococlawservice.dto.*;
 import com.cococlown.cococlawservice.service.AuthService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -22,7 +20,7 @@ public class AuthController {
     private AuthService authService;
 
     /**
-     * 用户登录
+     * 用户登录（邮箱+密码 或 邮箱+验证码）
      */
     @ApiOperation("用户登录")
     @PostMapping("/login")
@@ -36,7 +34,7 @@ public class AuthController {
     }
 
     /**
-     * 用户注册
+     * 用户注册（邮箱注册）
      */
     @ApiOperation("用户注册")
     @PostMapping("/register")
@@ -50,17 +48,56 @@ public class AuthController {
     }
 
     /**
-     * 发送验证码
+     * 发送验证码（用于登录/注册）
      */
     @ApiOperation("发送验证码")
     @PostMapping("/captcha")
-    public Result<Boolean> sendCaptcha(@RequestParam String phone) {
+    public Result<Boolean> sendCaptcha(@RequestParam String email) {
         try {
-            boolean success = authService.sendCaptcha(phone);
+            boolean success = authService.sendCaptcha(email);
             return Result.success("验证码已发送", success);
         } catch (RuntimeException e) {
             return Result.error(e.getMessage());
         }
+    }
+
+    /**
+     * 忘记密码 - 发送重置邮件
+     */
+    @ApiOperation("忘记密码 - 发送重置邮件")
+    @PostMapping("/forget-password")
+    public Result<String> forgetPassword(@RequestBody ForgetPasswordDTO dto) {
+        try {
+            authService.sendResetPasswordEmail(dto.getEmail());
+            // 统一返回成功，防止枚举攻击
+            return Result.success("如果该邮箱已注册，我们将发送密码重置链接", null);
+        } catch (RuntimeException e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 重置密码（通过Token）
+     */
+    @ApiOperation("重置密码")
+    @PostMapping("/reset-password")
+    public Result<String> resetPassword(@RequestBody ResetPasswordDTO dto) {
+        try {
+            authService.resetPassword(dto);
+            return Result.success("密码重置成功", null);
+        } catch (RuntimeException e) {
+            return Result.error(400, e.getMessage());
+        }
+    }
+
+    /**
+     * 验证重置Token是否有效
+     */
+    @ApiOperation("验证重置Token")
+    @GetMapping("/verify-reset-token")
+    public Result<Boolean> verifyResetToken(@RequestParam String token) {
+        boolean valid = authService.verifyResetToken(token);
+        return Result.success(valid);
     }
 
     /**

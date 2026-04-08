@@ -13,9 +13,14 @@ public class RegisterDTO implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 用户名
+     * 昵称
      */
-    private String username;
+    private String nickname;
+
+    /**
+     * 邮箱（登录凭证）
+     */
+    private String email;
 
     /**
      * 密码
@@ -28,17 +33,7 @@ public class RegisterDTO implements Serializable {
     private String confirmPassword;
 
     /**
-     * 手机号
-     */
-    private String phone;
-
-    /**
-     * 邮箱
-     */
-    private String email;
-
-    /**
-     * 验证码
+     * 邮箱验证码
      */
     private String captchaCode;
 }

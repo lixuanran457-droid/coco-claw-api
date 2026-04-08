@@ -23,12 +23,12 @@ public class PaymentController {
     private PaymentService paymentService;
 
     /**
-     * 创建支付订单
+     * 创建支付订单（支持游客下单）
      */
     @ApiOperation("创建支付订单")
     @PostMapping("/create")
     public Result<PaymentDTO> createPayment(
-            @RequestHeader("X-User-Id") Long userId,
+            @RequestHeader(value = "X-User-Id", required = false) Long userId,
             @RequestBody PaymentCreateDTO dto) {
         try {
             PaymentDTO payment = paymentService.createPayment(userId, dto);

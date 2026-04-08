@@ -20,17 +20,17 @@ public class PaymentCreateDTO implements Serializable {
     private String paymentMethod;
 
     /**
-     * 订单ID列表（从购物车购买）
+     * 技能ID（直接购买单个商品）
      */
-    private List<Long> cartIds;
+    private Long skillId;
 
     /**
-     * 技能ID列表（直接购买）
+     * 游客邮箱（游客下单时必填）
      */
-    private List<Long> skillIds;
+    private String email;
 
     /**
-     * 优惠券ID
+     * 优惠券ID（可选）
      */
     private Long couponId;
 }

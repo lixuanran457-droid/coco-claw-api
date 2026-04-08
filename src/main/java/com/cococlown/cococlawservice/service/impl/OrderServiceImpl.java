@@ -15,6 +15,7 @@ import com.cococlown.cococlawservice.service.CouponService;
 import com.cococlown.cococlawservice.service.OrderService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +24,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 订单服务实现类
@@ -41,6 +43,9 @@ public class OrderServiceImpl implements OrderService {
 
     @Autowired
     private CouponService couponService;
+
+    @Autowired
+    private StringRedisTemplate redisTemplate;
 
     /**
      * 订单过期时间（分钟）
@@ -365,5 +370,59 @@ public class OrderServiceImpl implements OrderService {
             case 6: return "已退款";
             default: return "未知";
         }
+    }
+
+    // ==================== 游客订单查询 ====================
+
+    @Override
+    public void sendGuestQueryCaptcha(String email) {
+        // 生成6位验证码
+        String captcha = String.format("%06d", (int) ((Math.random() * 9 + 1) * 100000));
+
+        // 存入Redis，5分钟有效期
+        String key = "guest_query:" + email;
+        redisTemplate.opsForValue().set(key, captcha, 5, TimeUnit.MINUTES);
+
+        // TODO: 实际项目中应调用邮件服务发送验证码
+        System.out.println("【COCO CLAW】游客查单验证码: " + captcha + "，5分钟内有效，发送至: " + email);
+    }
+
+    @Override
+    public IPage<OrderDTO> getGuestOrderPage(String email, String captcha, OrderQueryDTO query) {
+        // 验证验证码
+        String key = "guest_query:" + email;
+        String cachedCaptcha = redisTemplate.opsForValue().get(key);
+
+        if (cachedCaptcha == null || !cachedCaptcha.equals(captcha)) {
+            throw new RuntimeException("验证码错误或已过期");
+        }
+
+        // 清除验证码（一次性使用）
+        redisTemplate.delete(key);
+
+        // 查询该邮箱的所有订单
+        Page<Order> page = new Page<>(query.getPage(), query.getPageSize());
+
+        LambdaQueryWrapper<Order> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Order::getEmail, email);
+
+        // 状态筛选
+        if (query.getStatus() != null) {
+            wrapper.eq(Order::getStatus, query.getStatus());
+        }
+
+        wrapper.orderByDesc(Order::getCreateTime);
+
+        IPage<Order> orderPage = orderMapper.selectPage(page, wrapper);
+
+        // 转换为DTO
+        Page<OrderDTO> dtoPage = new Page<>(orderPage.getCurrent(), orderPage.getSize(), orderPage.getTotal());
+        List<OrderDTO> dtoList = new ArrayList<>();
+        for (Order order : orderPage.getRecords()) {
+            dtoList.add(convertToDTO(order));
+        }
+        dtoPage.setRecords(dtoList);
+
+        return dtoPage;
     }
 }
