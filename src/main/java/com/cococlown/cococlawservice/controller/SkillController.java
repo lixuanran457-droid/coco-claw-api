@@ -48,11 +48,22 @@ public class SkillController {
     }
 
     /**
+     * 价格校验常量
+     */
+    private static final BigDecimal MIN_PRICE = new BigDecimal("0.01");
+    private static final BigDecimal MAX_PRICE = new BigDecimal("99999.00");
+
+    /**
      * 创建SKILL（后台）
      */
     @ApiOperation("创建SKILL")
     @PostMapping
     public Result<Boolean> createSkill(@RequestBody Skill skill) {
+        // 价格校验
+        Result<Boolean> validation = validatePrice(skill);
+        if (validation != null) {
+            return validation;
+        }
         boolean success = skillService.createSkill(skill);
         if (success) {
             return Result.success("创建成功", true);
@@ -66,12 +77,41 @@ public class SkillController {
     @ApiOperation("更新SKILL")
     @PutMapping("/{id}")
     public Result<Boolean> updateSkill(@PathVariable Long id, @RequestBody Skill skill) {
+        // 价格校验
+        Result<Boolean> validation = validatePrice(skill);
+        if (validation != null) {
+            return validation;
+        }
         skill.setId(id);
         boolean success = skillService.updateSkill(skill);
         if (success) {
             return Result.success("更新成功", true);
         }
         return Result.error("更新失败");
+    }
+
+    /**
+     * 价格校验逻辑
+     */
+    private Result<Boolean> validatePrice(Skill skill) {
+        // 付费商品必须设置价格
+        if (skill.getPriceType() != null && skill.getPriceType() == 1) {
+            if (skill.getPrice() == null) {
+                return Result.error("付费商品必须设置价格");
+            }
+            BigDecimal price = skill.getPrice();
+            if (price.compareTo(MIN_PRICE) < 0) {
+                return Result.error("价格不能低于 " + MIN_PRICE);
+            }
+            if (price.compareTo(MAX_PRICE) > 0) {
+                return Result.error("价格不能超过 " + MAX_PRICE);
+            }
+        }
+        // 免费商品价格必须为0
+        if (skill.getPriceType() != null && skill.getPriceType() == 0) {
+            skill.setPrice(BigDecimal.ZERO);
+        }
+        return null;
     }
 
     /**

@@ -5,84 +5,80 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * 用户实体类
+ * 支付记录实体类
  */
 @Data
 @EqualsAndHashCode(callSuper = false)
-@TableName("user")
-public class User implements Serializable {
+@TableName("payment")
+public class Payment implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     /**
-     * 用户ID
+     * 支付ID
      */
     @TableId(value = "id", type = IdType.AUTO)
     private Long id;
 
     /**
-     * 用户名
+     * 用户ID
      */
-    private String username;
+    private Long userId;
 
     /**
-     * 密码
+     * 订单ID
      */
-    private String password;
+    private Long orderId;
 
     /**
-     * 手机号
+     * 订单号
      */
-    private String phone;
+    private String orderNo;
 
     /**
-     * 邮箱
+     * 支付方式: alipay, wechat
      */
-    private String email;
+    private String paymentMethod;
 
     /**
-     * 头像
+     * 第三方交易号
      */
-    private String avatar;
+    private String tradeNo;
 
     /**
-     * 昵称
+     * 支付金额
      */
-    private String nickname;
+    private BigDecimal amount;
 
     /**
-     * 性别: 0-未知, 1-男, 2-女
-     */
-    private Integer gender;
-
-    /**
-     * 生日
-     */
-    private String birthday;
-
-    /**
-     * 个人简介
-     */
-    private String bio;
-
-    /**
-     * 余额
-     */
-    private java.math.BigDecimal balance;
-
-    /**
-     * 状态: 0-禁用, 1-启用
+     * 支付状态: 0-待支付, 1-支付中, 2-已支付, 3-支付失败, 4-退款中, 5-已退款
      */
     private Integer status;
+
+    /**
+     * 支付链接/二维码
+     */
+    private String payUrl;
+
+    /**
+     * 支付时间
+     */
+    private LocalDateTime payTime;
 
     /**
      * 创建时间
      */
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
+
+    /**
+     * 过期时间
+     */
+    private LocalDateTime expireTime;
 
     /**
      * 逻辑删除: 0-未删除, 1-已删除

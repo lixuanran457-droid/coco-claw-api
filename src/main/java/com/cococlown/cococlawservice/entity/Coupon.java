@@ -5,73 +5,66 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * 用户实体类
+ * 优惠券实体类
  */
 @Data
 @EqualsAndHashCode(callSuper = false)
-@TableName("user")
-public class User implements Serializable {
+@TableName("coupon")
+public class Coupon implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    /**
-     * 用户ID
-     */
     @TableId(value = "id", type = IdType.AUTO)
     private Long id;
 
     /**
-     * 用户名
+     * 优惠券名称
      */
-    private String username;
+    private String name;
 
     /**
-     * 密码
+     * 优惠券类型: 1-满减券, 2-折扣券, 3-无门槛券
      */
-    private String password;
+    private Integer type;
 
     /**
-     * 手机号
+     * 优惠值（满减金额或折扣率）
      */
-    private String phone;
+    private BigDecimal value;
 
     /**
-     * 邮箱
+     * 使用门槛（满X元可用）
      */
-    private String email;
+    private BigDecimal minAmount;
 
     /**
-     * 头像
+     * 发放总量
      */
-    private String avatar;
+    private Integer totalCount;
 
     /**
-     * 昵称
+     * 已使用数量
      */
-    private String nickname;
+    private Integer usedCount;
 
     /**
-     * 性别: 0-未知, 1-男, 2-女
+     * 每人限领数量
      */
-    private Integer gender;
+    private Integer perLimit;
 
     /**
-     * 生日
+     * 开始时间
      */
-    private String birthday;
+    private LocalDateTime startTime;
 
     /**
-     * 个人简介
+     * 结束时间
      */
-    private String bio;
-
-    /**
-     * 余额
-     */
-    private java.math.BigDecimal balance;
+    private LocalDateTime endTime;
 
     /**
      * 状态: 0-禁用, 1-启用
@@ -85,7 +78,7 @@ public class User implements Serializable {
     private LocalDateTime createTime;
 
     /**
-     * 逻辑删除: 0-未删除, 1-已删除
+     * 逻辑删除
      */
     @TableLogic
     private Integer deleted;

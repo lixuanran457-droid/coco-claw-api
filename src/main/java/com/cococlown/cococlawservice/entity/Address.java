@@ -8,75 +8,67 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
- * 用户实体类
+ * 收货地址实体类
  */
 @Data
 @EqualsAndHashCode(callSuper = false)
-@TableName("user")
-public class User implements Serializable {
+@TableName("address")
+public class Address implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    /**
-     * 用户ID
-     */
     @TableId(value = "id", type = IdType.AUTO)
     private Long id;
 
     /**
-     * 用户名
+     * 用户ID
      */
-    private String username;
+    private Long userId;
 
     /**
-     * 密码
+     * 收货人姓名
      */
-    private String password;
+    private String receiverName;
 
     /**
-     * 手机号
+     * 联系电话
      */
     private String phone;
 
     /**
-     * 邮箱
+     * 省份
      */
-    private String email;
+    private String province;
 
     /**
-     * 头像
+     * 城市
      */
-    private String avatar;
+    private String city;
 
     /**
-     * 昵称
+     * 区/县
      */
-    private String nickname;
+    private String district;
 
     /**
-     * 性别: 0-未知, 1-男, 2-女
+     * 详细地址
      */
-    private Integer gender;
+    private String detail;
 
     /**
-     * 生日
+     * 邮编
      */
-    private String birthday;
+    private String postalCode;
 
     /**
-     * 个人简介
+     * 是否默认地址: 0-否, 1-是
      */
-    private String bio;
+    private Integer isDefault;
 
     /**
-     * 余额
+     * 标签（如：家、公司）
      */
-    private java.math.BigDecimal balance;
-
-    /**
-     * 状态: 0-禁用, 1-启用
-     */
-    private Integer status;
+    private String tag;
 
     /**
      * 创建时间
@@ -85,7 +77,13 @@ public class User implements Serializable {
     private LocalDateTime createTime;
 
     /**
-     * 逻辑删除: 0-未删除, 1-已删除
+     * 更新时间
+     */
+    @TableField(fill = FieldFill.INSERT_UPDATE)
+    private LocalDateTime updateTime;
+
+    /**
+     * 逻辑删除
      */
     @TableLogic
     private Integer deleted;

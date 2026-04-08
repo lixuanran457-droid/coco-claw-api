@@ -55,6 +55,11 @@ public class Skill implements Serializable {
     private BigDecimal price;
 
     /**
+     * 价格类型: 0-免费, 1-付费
+     */
+    private Integer priceType;
+
+    /**
      * 原价
      */
     private BigDecimal originalPrice;

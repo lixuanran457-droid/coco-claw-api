@@ -35,14 +35,119 @@ public class Order implements Serializable {
     private String orderNo;
 
     /**
+     * 技能ID
+     */
+    private Long skillId;
+
+    /**
+     * 技能名称
+     */
+    private String skillName;
+
+    /**
+     * 技能图标
+     */
+    private String skillIcon;
+
+    /**
+     * 数量
+     */
+    private Integer quantity;
+
+    /**
+     * 单价
+     */
+    private BigDecimal price;
+
+    /**
      * 总金额
      */
     private BigDecimal totalAmount;
 
     /**
-     * 订单状态: 0-待支付, 1-已支付, 2-已完成, 3-已取消
+     * 优惠券ID
+     */
+    private Long couponId;
+
+    /**
+     * 优惠金额
+     */
+    private BigDecimal discountAmount;
+
+    /**
+     * 实际支付金额
+     */
+    private BigDecimal payAmount;
+
+    /**
+     * 支付方式: alipay, wechat, balance
+     */
+    private String paymentMethod;
+
+    /**
+     * 支付流水号
+     */
+    private String tradeNo;
+
+    /**
+     * 订单状态: 0-待支付, 1-支付中, 2-已支付, 3-已完成, 4-已取消, 5-退款中, 6-已退款
      */
     private Integer status;
+
+    /**
+     * 收货地址ID
+     */
+    private Long addressId;
+
+    /**
+     * 收货人姓名
+     */
+    private String receiverName;
+
+    /**
+     * 收货人电话
+     */
+    private String receiverPhone;
+
+    /**
+     * 收货地址
+     */
+    private String deliveryAddress;
+
+    /**
+     * 用户备注
+     */
+    private String remark;
+
+    /**
+     * 退款原因
+     */
+    private String refundReason;
+
+    /**
+     * 支付时间
+     */
+    private LocalDateTime payTime;
+
+    /**
+     * 退款申请时间
+     */
+    private LocalDateTime refundApplyTime;
+
+    /**
+     * 退款时间
+     */
+    private LocalDateTime refundTime;
+
+    /**
+     * 完成时间
+     */
+    private LocalDateTime completeTime;
+
+    /**
+     * 过期时间
+     */
+    private LocalDateTime expireTime;
 
     /**
      * 创建时间
