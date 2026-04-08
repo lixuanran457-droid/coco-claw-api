@@ -9,9 +9,11 @@ import com.cococlown.cococlawservice.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.util.DigestUtils;
 
+import java.security.SecureRandom;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -37,6 +39,33 @@ public class AuthServiceImpl implements AuthService {
     @Value("${app.base-url:http://localhost:3000}")
     private String baseUrl;
 
+    /**
+     * 密码加密器
+     */
+    private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+
+    /**
+     * 安全的随机数生成器
+     */
+    private final SecureRandom secureRandom = new SecureRandom();
+
+    /**
+     * 验证码发送频率限制：同一个邮箱60秒内只能发送一次
+     */
+    private static final long CAPTCHA_SEND_INTERVAL_SECONDS = 60;
+
+    /**
+     * 验证码发送频率限制：同一IP一小时最多发送20次
+     */
+    private static final String CAPTCHA_IP_LIMIT_KEY = "captcha:ip_limit:";
+    private static final int CAPTCHA_IP_HOURLY_LIMIT = 20;
+
+    /**
+     * 验证码发送频率限制：同一邮箱一天最多发送30次
+     */
+    private static final String CAPTCHA_EMAIL_DAILY_LIMIT_KEY = "captcha:email_daily_limit:";
+    private static final int CAPTCHA_EMAIL_DAILY_LIMIT = 30;
+
     @Override
     public AuthResponseDTO login(LoginDTO loginDTO) {
         // 校验邮箱
@@ -44,9 +73,14 @@ public class AuthServiceImpl implements AuthService {
             throw new RuntimeException("邮箱不能为空");
         }
 
+        // 邮箱格式校验
+        if (!isValidEmail(loginDTO.getEmail())) {
+            throw new RuntimeException("邮箱格式不正确");
+        }
+
         // 查询用户
         User user = userMapper.selectOne(
-            new LambdaQueryWrapper<User>().eq(User::getEmail, loginDTO.getEmail())
+            new LambdaQueryWrapper<User>().eq(User::getEmail, loginDTO.getEmail().toLowerCase())
         );
 
         if (user == null) {
@@ -60,8 +94,8 @@ public class AuthServiceImpl implements AuthService {
                 throw new RuntimeException("验证码错误或已过期");
             }
         } else if (loginDTO.getPassword() != null && !loginDTO.getPassword().isEmpty()) {
-            // 密码登录
-            if (!user.getPassword().equals(loginDTO.getPassword())) {
+            // 密码登录 - 使用BCrypt验证
+            if (!passwordEncoder.matches(loginDTO.getPassword(), user.getPassword())) {
                 throw new RuntimeException("密码错误");
             }
         } else {
@@ -92,15 +126,23 @@ public class AuthServiceImpl implements AuthService {
             throw new RuntimeException("确认密码不能为空");
         }
 
+        // 邮箱格式校验
+        if (!isValidEmail(registerDTO.getEmail())) {
+            throw new RuntimeException("邮箱格式不正确");
+        }
+
         // 验证密码确认
         if (!registerDTO.getPassword().equals(registerDTO.getConfirmPassword())) {
             throw new RuntimeException("两次密码输入不一致");
         }
 
-        // 密码强度校验（8-20位）
+        // 密码强度校验（8-20位，包含大小写字母和数字）
         String password = registerDTO.getPassword();
         if (password.length() < 8 || password.length() > 20) {
             throw new RuntimeException("密码长度必须在8-20位之间");
+        }
+        if (!password.matches("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{8,20}$")) {
+            throw new RuntimeException("密码必须包含大小写字母和数字");
         }
 
         // 验证邮箱验证码
@@ -112,17 +154,20 @@ public class AuthServiceImpl implements AuthService {
         }
 
         // 检查邮箱是否已存在
+        String normalizedEmail = registerDTO.getEmail().toLowerCase();
         LambdaQueryWrapper<User> emailWrapper = new LambdaQueryWrapper<>();
-        emailWrapper.eq(User::getEmail, registerDTO.getEmail());
+        emailWrapper.eq(User::getEmail, normalizedEmail);
         if (userMapper.selectCount(emailWrapper) > 0) {
             throw new RuntimeException("该邮箱已被注册");
         }
 
-        // 创建用户
+        // 创建用户 - 密码使用BCrypt加密
         User user = new User();
-        user.setNickname(registerDTO.getNickname() != null ? registerDTO.getNickname() : "用户" + System.currentTimeMillis() % 10000);
-        user.setEmail(registerDTO.getEmail());
-        user.setPassword(registerDTO.getPassword());
+        user.setNickname(registerDTO.getNickname() != null && !registerDTO.getNickname().isEmpty()
+            ? registerDTO.getNickname()
+            : "用户" + System.currentTimeMillis() % 10000);
+        user.setEmail(normalizedEmail);
+        user.setPassword(passwordEncoder.encode(registerDTO.getPassword())); // BCrypt加密
         user.setStatus(1); // 启用状态
 
         userMapper.insert(user);
@@ -135,18 +180,75 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public boolean sendCaptcha(String email) {
-        // 生成6位验证码
-        String captcha = String.format("%06d", (int) ((Math.random() * 9 + 1) * 100000));
+        // 邮箱格式校验
+        if (email == null || !isValidEmail(email)) {
+            throw new RuntimeException("邮箱格式不正确");
+        }
+
+        String normalizedEmail = email.toLowerCase();
+        String emailLimitKey = CAPTCHA_EMAIL_DAILY_LIMIT_KEY + normalizedEmail;
+
+        // 检查邮箱每日发送次数限制
+        String dailyCountStr = redisTemplate.opsForValue().get(emailLimitKey);
+        int dailyCount = dailyCountStr != null ? Integer.parseInt(dailyCountStr) : 0;
+        if (dailyCount >= CAPTCHA_EMAIL_DAILY_LIMIT) {
+            throw new RuntimeException("今日发送次数已达上限，请明天再试");
+        }
+
+        // 检查60秒内是否发送过
+        String intervalKey = "captcha:interval:" + normalizedEmail;
+        if (Boolean.TRUE.equals(redisTemplate.hasKey(intervalKey))) {
+            throw new RuntimeException("发送太频繁，请" + CAPTCHA_SEND_INTERVAL_SECONDS + "秒后再试");
+        }
+
+        // 生成6位安全验证码
+        String captcha = generateSecureCaptcha();
 
         // 存入Redis，5分钟有效期
-        String key = "captcha:" + email;
-        redisTemplate.opsForValue().set(key, captcha, 5, TimeUnit.MINUTES);
+        String captchaKey = "captcha:" + normalizedEmail;
+        redisTemplate.opsForValue().set(captchaKey, captcha, 5, TimeUnit.MINUTES);
+
+        // 设置60秒发送间隔限制
+        redisTemplate.opsForValue().set(intervalKey, "1", CAPTCHA_SEND_INTERVAL_SECONDS, TimeUnit.SECONDS);
+
+        // 设置每日发送次数限制（当天24点过期）
+        long secondsToMidnight = getSecondsToMidnight();
+        redisTemplate.opsForValue().increment(emailLimitKey);
+        redisTemplate.expire(emailLimitKey, secondsToMidnight, TimeUnit.SECONDS);
 
         // TODO: 实际项目中应调用邮件服务发送验证码
         // 这里仅打印到日志，实际部署时请替换为真实邮件发送
-        System.out.println("【COCO CLAW】邮箱验证码: " + captcha + "，5分钟内有效，发送至: " + email);
+        System.out.println("【COCO CLAW】邮箱验证码: " + captcha + "，5分钟内有效，发送至: " + normalizedEmail);
 
         return true;
+    }
+
+    /**
+     * 生成安全的6位验证码
+     */
+    private String generateSecureCaptcha() {
+        int captcha = secureRandom.nextInt(900000) + 100000; // 100000-999999
+        return String.valueOf(captcha);
+    }
+
+    /**
+     * 邮箱格式校验
+     */
+    private boolean isValidEmail(String email) {
+        if (email == null || email.isEmpty()) {
+            return false;
+        }
+        String regex = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$";
+        return email.matches(regex);
+    }
+
+    /**
+     * 获取到当天午夜剩余秒数
+     */
+    private long getSecondsToMidnight() {
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        java.time.LocalDateTime midnight = now.toLocalDate().plusDays(1).atStartOfDay();
+        return java.time.Duration.between(now, midnight).getSeconds();
     }
 
     @Override
@@ -172,15 +274,27 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public void sendResetPasswordEmail(String email) {
+        if (email == null || !isValidEmail(email)) {
+            throw new RuntimeException("邮箱格式不正确");
+        }
+
+        String normalizedEmail = email.toLowerCase();
+
         // 检查邮箱是否存在
         User user = userMapper.selectOne(
-            new LambdaQueryWrapper<User>().eq(User::getEmail, email)
+            new LambdaQueryWrapper<User>().eq(User::getEmail, normalizedEmail)
         );
 
         if (user == null) {
             // 为防止枚举攻击，不提示用户邮箱不存在
-            System.out.println("【COCO CLAW】密码重置请求: 邮箱不存在 - " + email);
+            System.out.println("【COCO CLAW】密码重置请求: 邮箱不存在 - " + normalizedEmail);
             return;
+        }
+
+        // 检查60秒内是否发送过
+        String intervalKey = "reset:interval:" + normalizedEmail;
+        if (Boolean.TRUE.equals(redisTemplate.hasKey(intervalKey))) {
+            throw new RuntimeException("发送太频繁，请稍后再试");
         }
 
         // 生成重置Token（32位UUID）
@@ -190,14 +304,17 @@ public class AuthServiceImpl implements AuthService {
         String key = "reset_password:" + resetToken;
         Map<String, String> data = Map.of(
             "userId", String.valueOf(user.getId()),
-            "email", email
+            "email", normalizedEmail
         );
         redisTemplate.opsForHash().putAll(key, data);
         redisTemplate.expire(key, 30, TimeUnit.MINUTES);
 
+        // 设置60秒发送间隔限制
+        redisTemplate.opsForValue().set(intervalKey, "1", 60, TimeUnit.SECONDS);
+
         // TODO: 实际项目中应调用邮件服务发送重置链接
         String resetUrl = baseUrl + "/reset-password?token=" + resetToken;
-        System.out.println("【COCO CLAW】密码重置链接: " + resetUrl + "，30分钟内有效，发送至: " + email);
+        System.out.println("【COCO CLAW】密码重置链接: " + resetUrl + "，30分钟内有效，发送至: " + normalizedEmail);
     }
 
     @Override
@@ -213,6 +330,9 @@ public class AuthServiceImpl implements AuthService {
         }
         if (dto.getNewPassword().length() < 8 || dto.getNewPassword().length() > 20) {
             throw new RuntimeException("密码长度必须在8-20位之间");
+        }
+        if (!dto.getNewPassword().matches("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{8,20}$")) {
+            throw new RuntimeException("密码必须包含大小写字母和数字");
         }
 
         // 确认密码
@@ -237,13 +357,13 @@ public class AuthServiceImpl implements AuthService {
 
         Long userId = Long.parseLong(userIdStr);
 
-        // 更新密码
+        // 更新密码 - 使用BCrypt加密
         User user = userMapper.selectById(userId);
         if (user == null) {
             throw new RuntimeException("用户不存在");
         }
 
-        user.setPassword(dto.getNewPassword());
+        user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
         userMapper.updateById(user);
 
         // 使Token失效
@@ -268,7 +388,8 @@ public class AuthServiceImpl implements AuthService {
         if (code == null || code.isEmpty()) {
             return false;
         }
-        String key = "captcha:" + email;
+        String normalizedEmail = email.toLowerCase();
+        String key = "captcha:" + normalizedEmail;
         String cachedCaptcha = redisTemplate.opsForValue().get(key);
         return code.equals(cachedCaptcha);
     }
