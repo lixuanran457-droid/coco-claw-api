@@ -1,5 +1,7 @@
 package com.cococlown.cococlawservice.config;
 
+import com.cococlown.cococlawservice.filter.JwtAuthenticationFilter;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -8,6 +10,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -18,10 +21,14 @@ import java.util.List;
 /**
  * Spring Security 配置
  * 前后端分离项目，禁用CSRF，使用JWT无状态认证
+ * Token存储在httpOnly Cookie中，防止XSS攻击
  */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
+    @Autowired
+    private JwtAuthenticationFilter jwtAuthenticationFilter;
 
     /**
      * 密码加密器
@@ -40,13 +47,16 @@ public class SecurityConfig {
             // 禁用CSRF（前后端分离项目使用JWT，不需要CSRF）
             .csrf().disable()
             
-            // 禁用CORS（使用自定义CorsConfig）
+            // 配置CORS
             .cors().and()
             
             // 配置会话管理为无状态（使用JWT）
             .sessionManagement()
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             .and()
+            
+            // 添加JWT认证过滤器
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
             
             // 配置请求授权
             .authorizeRequests()
@@ -73,7 +83,7 @@ public class SecurityConfig {
             // 禁用默认登录页
             .httpBasic().disable()
             .formLogin().disable();
-
+            
         return http.build();
     }
 
