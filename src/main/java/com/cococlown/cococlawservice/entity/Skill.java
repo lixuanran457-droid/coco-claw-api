@@ -126,4 +126,32 @@ public class Skill implements Serializable {
      */
     @TableLogic
     private Integer deleted;
+    
+    // ==================== API相关字段 ====================
+    
+    /**
+     * API Key
+     */
+    private String apiKey;
+    
+    /**
+     * API端点
+     */
+    private String apiEndpoint;
+    
+    /**
+     * API文档URL
+     */
+    private String documentationUrl;
+    
+    /**
+     * 最大使用次数（0表示无限制）
+     */
+    private Integer maxUsageCount;
+    
+    /**
+     * 分类名称（非数据库字段，用于关联查询）
+     */
+    @TableField(exist = false)
+    private String categoryName;
 }

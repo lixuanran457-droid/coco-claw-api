@@ -5,6 +5,7 @@ import lombok.Data;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Map;
 
 /**
  * 支付DTO
@@ -26,4 +27,12 @@ public class PaymentDTO implements Serializable {
     private LocalDateTime createTime;
     private LocalDateTime expireTime;  // 订单过期时间
     private String skillName;    // 商品名称
+    
+    /**
+     * 支付参数（根据支付方式返回不同格式）
+     * - alipay: {type: "html", payForm: "..."}
+     * - wechat: {type: "qrcode", codeUrl: "..."}
+     * - sandbox: {type: "sandbox", orderNo: "..."}
+     */
+    private Map<String, Object> payParams;
 }

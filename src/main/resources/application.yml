@@ -86,3 +86,36 @@ logging:
     com.cococlown.cococlawservice: DEBUG
   pattern:
     console: '%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{50} - %msg%n'
+
+# 支付配置
+payment:
+  # 支付回调地址
+  callback:
+    base-url: http://localhost:8080
+    alipay-path: /api/payment/callback/alipay
+    wechat-path: /api/payment/callback/wechat
+
+  # 沙箱环境配置
+  sandbox:
+    enabled: true
+
+  # 支付宝配置
+  alipay:
+    app-id: ${ALIPAY_APP_ID:2021000000000000}
+    private-key: ${ALIPAY_PRIVATE_KEY:}
+    alipay-public-key: ${ALIPAY_PUBLIC_KEY:}
+    notify-url: ${ALIPAY_NOTIFY_URL:http://localhost:8080/api/payment/callback/alipay}
+    return-url: ${ALIPAY_RETURN_URL:http://localhost:3000/pay/success}
+    sign-type: RSA2
+    gateway: https://openapi-sandbox.dl.alipaydev.com/gateway.do
+
+  # 微信支付配置
+  wechatpay:
+    mchid: ${WECHATPAY_MCHID:}
+    serial-no: ${WECHATPAY_SERIAL_NO:}
+    private-key-path: classpath:cert/apiclient_key.pem
+    alipay-cert-path: classpath:cert/wechatpay_cert.pem
+    notify-url: ${WECHATPAY_NOTIFY_URL:http://localhost:8080/api/payment/callback/wechat}
+    api-key: ${WECHATPAY_API_KEY:}
+    appid: ${WECHATPAY_APPID:}
+    domain: https://api.mch.weixin.qq.com

@@ -65,7 +65,7 @@ public class SecurityConfig {
             
             // 配置请求授权
             .authorizeRequests()
-                // 公开接口：认证相关接口、Swagger文档、静态资源
+                // 公开接口：认证相关接口、Swagger文档、静态资源、用户技能
                 .antMatchers(
                     "/api/auth/**",
                     "/api/skills/**",
@@ -76,6 +76,7 @@ public class SecurityConfig {
                     "/api/recommend/**",
                     "/api/payment/**",
                     "/api/orders/guest/**",
+                    "/api/user/skill/**",       // 用户技能API - 支持游客邮箱查询
                     "/swagger-ui/**",
                     "/v2/api-docs/**",
                     "/swagger-resources/**",

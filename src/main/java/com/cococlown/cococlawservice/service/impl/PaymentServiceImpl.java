@@ -1,15 +1,20 @@
 package com.cococlown.cococlawservice.service.impl;
 
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cococlown.cococlawservice.dto.PaymentCreateDTO;
 import com.cococlown.cococlawservice.dto.PaymentDTO;
 import com.cococlown.cococlawservice.entity.Order;
 import com.cococlown.cococlawservice.entity.Payment;
 import com.cococlown.cococlawservice.entity.Skill;
+import com.cococlown.cococlawservice.entity.UserSkill;
 import com.cococlown.cococlawservice.mapper.OrderMapper;
 import com.cococlown.cococlawservice.mapper.PaymentMapper;
 import com.cococlown.cococlawservice.mapper.SkillMapper;
+import com.cococlown.cococlawservice.mapper.UserSkillMapper;
 import com.cococlown.cococlawservice.service.PaymentService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -18,10 +23,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * 支付服务实现类
  */
+@Slf4j
 @Service
 public class PaymentServiceImpl implements PaymentService {
 
@@ -33,6 +41,15 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Autowired
     private SkillMapper skillMapper;
+
+    @Autowired
+    private UserSkillMapper userSkillMapper;
+
+    @Autowired
+    private AlipayService alipayService;
+
+    @Autowired
+    private WechatpayService wechatpayService;
 
     /**
      * 支付过期时间（分钟）
@@ -95,17 +112,12 @@ public class PaymentServiceImpl implements PaymentService {
         payment.setAmount(amount);
         payment.setPaymentMethod(dto.getPaymentMethod());
         payment.setStatus(0); // 待支付
-
-        LocalDateTime now = LocalDateTime.now();
-        payment.setCreateTime(now);
-        payment.setExpireTime(now.plusMinutes(PAYMENT_EXPIRE_MINUTES));
-
+        payment.setCreateTime(LocalDateTime.now());
+        payment.setExpireTime(LocalDateTime.now().plusMinutes(PAYMENT_EXPIRE_MINUTES));
         paymentMapper.insert(payment);
 
-        // 生成支付链接/二维码
-        String payUrl = generatePayUrl(payment, dto.getPaymentMethod());
-        payment.setPayUrl(payUrl);
-        paymentMapper.updateById(payment);
+        // 调用真正的支付服务生成支付参数
+        Map<String, Object> payParams = generateRealPayParams(order, payment);
 
         // 返回结果
         PaymentDTO result = new PaymentDTO();
@@ -113,8 +125,49 @@ public class PaymentServiceImpl implements PaymentService {
         result.setOrderId(order.getId());
         result.setOrderNo(orderNo);
         result.setSkillName(skill.getName());
+        result.setPayParams(payParams);
 
         return result;
+    }
+
+    /**
+     * 生成真正的支付参数
+     */
+    private Map<String, Object> generateRealPayParams(Order order, Payment payment) {
+        Map<String, Object> payParams = new HashMap<>();
+
+        try {
+            String paymentMethod = payment.getPaymentMethod();
+            
+            if ("alipay".equals(paymentMethod)) {
+                // 支付宝WAP支付
+                String payForm = alipayService.createWapPay(order, payment);
+                payParams.put("payForm", payForm);
+                payParams.put("type", "html"); // 前端需要渲染HTML表单
+            } else if ("wechat".equals(paymentMethod)) {
+                // 微信Native支付，返回二维码URL
+                String codeUrl = wechatpayService.createNativePay(order, payment);
+                payParams.put("codeUrl", codeUrl);
+                payParams.put("type", "qrcode"); // 前端需要展示二维码
+            } else if ("bankcard".equals(paymentMethod)) {
+                // 银行卡支付（预留）
+                payParams.put("type", "redirect");
+                payParams.put("payUrl", "/pay/bankcard?orderNo=" + payment.getOrderNo());
+            } else {
+                // 默认模拟支付（沙箱环境）
+                payParams.put("type", "mock");
+                payParams.put("orderNo", payment.getOrderNo());
+                payParams.put("mockPayUrl", "/pay/mock?orderNo=" + payment.getOrderNo());
+            }
+        } catch (Exception e) {
+            log.error("生成支付参数失败: {}", e.getMessage());
+            // 如果支付服务调用失败，返回沙箱参数
+            payParams.put("type", "sandbox");
+            payParams.put("orderNo", payment.getOrderNo());
+            payParams.put("message", "沙箱环境测试");
+        }
+
+        return payParams;
     }
 
     /**
@@ -141,7 +194,8 @@ public class PaymentServiceImpl implements PaymentService {
         order.setPayTime(LocalDateTime.now());
         orderMapper.insert(order);
 
-        // TODO: 给用户发放商品
+        // 给用户发放商品（技能交付）
+        deliverSkillToUser(order, userId, dto.getEmail(), skill);
 
         PaymentDTO result = new PaymentDTO();
         result.setOrderId(order.getId());
@@ -151,6 +205,50 @@ public class PaymentServiceImpl implements PaymentService {
         result.setSkillName(skill.getName());
 
         return result;
+    }
+
+    /**
+     * 技能交付 - 给用户发放技能
+     */
+    private void deliverSkillToUser(Order order, Long userId, String email, Skill skill) {
+        // 确定用户标识（userId或email）
+        String userIdentifier = userId != null ? userId.toString() : email;
+        
+        // 检查是否已经拥有该技能
+        LambdaQueryWrapper<UserSkill> wrapper = new LambdaQueryWrapper<>();
+        if (userId != null) {
+            wrapper.eq(UserSkill::getUserId, userId);
+        } else {
+            wrapper.eq(UserSkill::getEmail, email);
+        }
+        wrapper.eq(UserSkill::getSkillId, skill.getId());
+        UserSkill existingSkill = userSkillMapper.selectOne(wrapper);
+
+        if (existingSkill != null) {
+            // 已有该技能，增加使用次数
+            existingSkill.setUsageCount(existingSkill.getUsageCount() + 1);
+            existingSkill.setExpireTime(LocalDateTime.now().plusDays(365)); // 默认有效期1年
+            existingSkill.setUpdatedAt(LocalDateTime.now());
+            userSkillMapper.updateById(existingSkill);
+            log.info("用户技能使用次数增加: userId={}, skillId={}", userIdentifier, skill.getId());
+        } else {
+            // 新增用户技能记录
+            UserSkill userSkill = new UserSkill();
+            userSkill.setUserId(userId);
+            userSkill.setEmail(email != null ? email : null);
+            userSkill.setOrderId(order.getId());
+            userSkill.setSkillId(skill.getId());
+            userSkill.setSkillName(skill.getName());
+            userSkill.setSkillApiKey(skill.getApiKey()); // 复制API Key
+            userSkill.setUsageCount(0);
+            userSkill.setMaxUsageCount(skill.getMaxUsageCount() != null ? skill.getMaxUsageCount() : 0);
+            userSkill.setExpireTime(LocalDateTime.now().plusDays(365)); // 默认有效期1年
+            userSkill.setStatus(1); // 正常
+            userSkill.setCreateTime(LocalDateTime.now());
+            userSkill.setUpdatedAt(LocalDateTime.now());
+            userSkillMapper.insert(userSkill);
+            log.info("技能交付成功: userId={}, skillId={}", userIdentifier, skill.getId());
+        }
     }
 
     @Override
@@ -187,20 +285,41 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         // 判断支付状态
-        if ("TRADE_SUCCESS".equals(status) || "PAY_SUCCESS".equals(status)) {
+        boolean paymentSuccess = false;
+        
+        if ("alipay".equals(paymentMethod)) {
+            // 支付宝回调
+            if ("TRADE_SUCCESS".equals(status) || "TRADE_FINISHED".equals(status)) {
+                paymentSuccess = true;
+            }
+        } else if ("wechat".equals(paymentMethod)) {
+            // 微信回调
+            if ("SUCCESS".equals(params.get("result_code"))) {
+                paymentSuccess = true;
+                tradeNo = params.get("transaction_id");
+            }
+        }
+
+        if (paymentSuccess) {
             payment.setStatus(2); // 已支付
             payment.setPayTime(LocalDateTime.now());
             payment.setTradeNo(tradeNo);
 
-            // 更新订单状态
+            // 更新订单状态并交付技能
             Order order = orderMapper.selectById(payment.getOrderId());
             if (order != null) {
                 order.setStatus(2); // 已支付
                 order.setPayTime(LocalDateTime.now());
                 order.setTradeNo(tradeNo);
                 orderMapper.updateById(order);
+                
+                // 交付技能
+                Skill skill = skillMapper.selectById(order.getSkillId());
+                if (skill != null) {
+                    deliverSkillToUser(order, order.getUserId(), order.getEmail(), skill);
+                }
             }
-        } else if ("TRADE_CLOSED".equals(status)) {
+        } else if ("TRADE_CLOSED".equals(status) || "PAYERROR".equals(params.get("err_code"))) {
             payment.setStatus(3); // 支付关闭
             Order order = orderMapper.selectById(payment.getOrderId());
             if (order != null) {
@@ -221,6 +340,17 @@ public class PaymentServiceImpl implements PaymentService {
 
         if (payment == null || payment.getStatus() != 0) {
             return false;
+        }
+
+        // 尝试关闭第三方支付
+        try {
+            if ("alipay".equals(payment.getPaymentMethod())) {
+                alipayService.closeTrade(payment.getOrderNo());
+            } else if ("wechat".equals(payment.getPaymentMethod())) {
+                wechatpayService.closeTrade(payment.getOrderNo());
+            }
+        } catch (Exception e) {
+            log.warn("关闭支付失败: {}", e.getMessage());
         }
 
         payment.setStatus(3); // 支付取消
@@ -250,14 +380,24 @@ public class PaymentServiceImpl implements PaymentService {
             return false;
         }
 
+        // 检查技能使用情况
+        LambdaQueryWrapper<UserSkill> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(UserSkill::getOrderId, orderId);
+        UserSkill userSkill = userSkillMapper.selectOne(wrapper);
+        
+        // 如果已使用，拒绝退款
+        if (userSkill != null && userSkill.getUsageCount() > 0) {
+            throw new RuntimeException("技能已使用，无法申请退款");
+        }
+
         order.setStatus(5); // 退款中
         order.setRefundReason(reason);
         order.setRefundApplyTime(LocalDateTime.now());
         orderMapper.updateById(order);
 
-        LambdaQueryWrapper<Payment> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Payment::getOrderId, orderId);
-        Payment payment = paymentMapper.selectOne(wrapper);
+        LambdaQueryWrapper<Payment> paymentWrapper = new LambdaQueryWrapper<>();
+        paymentWrapper.eq(Payment::getOrderId, orderId);
+        Payment payment = paymentMapper.selectOne(paymentWrapper);
         if (payment != null) {
             payment.setStatus(4); // 退款中
             paymentMapper.updateById(payment);
@@ -274,19 +414,47 @@ public class PaymentServiceImpl implements PaymentService {
             return false;
         }
 
-        order.setStatus(6); // 已退款
-        order.setRefundTime(LocalDateTime.now());
-        orderMapper.updateById(order);
+        // 调用第三方支付退款
+        LambdaQueryWrapper<Payment> paymentWrapper = new LambdaQueryWrapper<>();
+        paymentWrapper.eq(Payment::getOrderId, orderId);
+        Payment payment = paymentMapper.selectOne(paymentWrapper);
 
-        LambdaQueryWrapper<Payment> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Payment::getOrderId, orderId);
-        Payment payment = paymentMapper.selectOne(wrapper);
+        boolean refundSuccess = false;
         if (payment != null) {
-            payment.setStatus(5); // 已退款
-            paymentMapper.updateById(payment);
+            try {
+                if ("alipay".equals(payment.getPaymentMethod())) {
+                    refundSuccess = alipayService.refund(order, order.getPayAmount(), order.getRefundReason());
+                } else if ("wechat".equals(payment.getPaymentMethod())) {
+                    refundSuccess = wechatpayService.refund(order, order.getPayAmount(), order.getRefundReason());
+                }
+            } catch (Exception e) {
+                log.error("第三方退款失败: {}", e.getMessage());
+            }
         }
 
-        return true;
+        if (refundSuccess) {
+            order.setStatus(6); // 已退款
+            order.setRefundTime(LocalDateTime.now());
+            orderMapper.updateById(order);
+
+            if (payment != null) {
+                payment.setStatus(5); // 已退款
+                paymentMapper.updateById(payment);
+            }
+
+            // 撤销用户技能
+            LambdaQueryWrapper<UserSkill> userSkillWrapper = new LambdaQueryWrapper<>();
+            userSkillWrapper.eq(UserSkill::getOrderId, orderId);
+            UserSkill userSkill = userSkillMapper.selectOne(userSkillWrapper);
+            if (userSkill != null) {
+                userSkillMapper.deleteById(userSkill);
+                log.info("用户技能已撤销: userSkillId={}", userSkill.getId());
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -295,17 +463,5 @@ public class PaymentServiceImpl implements PaymentService {
     private String generateOrderNo() {
         return "COCO" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
                + String.format("%04d", (int) (Math.random() * 10000));
-    }
-
-    /**
-     * 生成支付链接/二维码（模拟）
-     */
-    private String generatePayUrl(Payment payment, String method) {
-        if ("alipay".equals(method)) {
-            return "https://openapi.alipay.com/gateway.do?out_trade_no=" + payment.getOrderNo();
-        } else if ("wechat".equals(method)) {
-            return "weixin://wxpay/bizpayurl?pr=" + payment.getOrderNo();
-        }
-        return "mock://pay/" + payment.getOrderNo();
     }
 }
