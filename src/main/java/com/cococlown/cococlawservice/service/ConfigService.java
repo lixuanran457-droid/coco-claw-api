@@ -1,7 +1,6 @@
 package com.cococlown.cococlawservice.service;
 
-import com.cococlown.cococlawservice.entity.SysConfig;
-
+import com.cococlown.cococlawservice.entity.*;
 import java.util.List;
 import java.util.Map;
 
@@ -11,62 +10,37 @@ import java.util.Map;
 public interface ConfigService {
 
     /**
-     * 获取所有配置
+     * 获取首页所有配置数据
      */
-    List<SysConfig> getAllConfigs();
-
-    /**
-     * 根据键获取配置值
-     */
-    String getConfigValue(String configKey);
-
-    /**
-     * 根据键获取配置值，如果不存在返回默认值
-     */
-    String getConfigValue(String configKey, String defaultValue);
-
-    /**
-     * 根据键获取配置值，转换为整数
-     */
-    Integer getConfigValueAsInt(String configKey, Integer defaultValue);
-
-    /**
-     * 根据键获取配置值，转换为Boolean
-     */
-    Boolean getConfigValueAsBoolean(String configKey, Boolean defaultValue);
-
-    /**
-     * 保存或更新配置
-     */
-    boolean saveConfig(SysConfig config);
-
-    /**
-     * 批量保存或更新配置
-     */
-    boolean saveConfigs(List<SysConfig> configs);
-
-    /**
-     * 删除配置
-     */
-    boolean deleteConfig(Long id);
-
-    /**
-     * 初始化默认配置
-     */
-    void initDefaultConfigs();
+    Map<String, Object> getHomeConfig();
 
     /**
      * 获取Banner列表
      */
-    List<Map<String, Object>> getBannerList();
+    List<HomeBanner> getBanners();
 
     /**
-     * 获取货币符号
+     * 获取功能入口列表
      */
-    String getCurrencySymbol();
+    List<HomeFeature> getFeatures();
 
     /**
-     * 获取分页大小
+     * 获取精选推荐列表
      */
-    Integer getPageSize();
+    List<HomeRecommend> getRecommendations();
+
+    /**
+     * 获取FAQ列表
+     */
+    List<Faq> getFaqs();
+
+    /**
+     * 获取系统参数
+     */
+    String getSystemParam(String key);
+
+    /**
+     * 获取所有系统参数
+     */
+    Map<String, String> getAllSystemParams();
 }
