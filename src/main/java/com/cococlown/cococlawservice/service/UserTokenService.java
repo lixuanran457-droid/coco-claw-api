@@ -1,65 +1,47 @@
 package com.cococlown.cococlawservice.service;
 
-import com.cococlown.cococlawservice.dto.*;
-import com.cococlown.cococlawservice.entity.BalanceRecharge;
-import com.cococlown.cococlawservice.entity.UserBalance;
-import com.cococlown.cococlawservice.entity.UserSubscription;
-import java.util.List;
+import com.baomidou.mybatisplus.extension.service.IService;
+import com.cococlown.cococlawservice.entity.UserToken;
 
-public interface UserTokenService {
-
-    /**
-     * 获取用户所有资源（订阅 + 余额）
-     */
-    UserResourcesDTO getUserResources(Long userId);
+/**
+ * 用户Token Service接口
+ */
+public interface UserTokenService extends IService<UserToken> {
 
     /**
-     * 获取用户订阅列表
+     * 获取用户Token余额
+     * @param userId 用户ID
+     * @return 用户Token信息
      */
-    List<UserSubscription> getUserSubscriptions(Long userId);
+    UserToken getUserToken(Long userId);
 
     /**
-     * 获取用户余额
+     * 扣除Token
+     * @param userId 用户ID
+     * @param amount 数量
+     * @return 是否成功
      */
-    UserBalance getUserBalance(Long userId);
+    boolean deductToken(Long userId, Integer amount);
 
     /**
-     * 获取用户API Key
+     * 增加Token
+     * @param userId 用户ID
+     * @param amount 数量
+     * @return 是否成功
      */
-    String getUserApiKey(Long userId);
+    boolean addToken(Long userId, Integer amount);
 
     /**
-     * 切换当前使用的资源
+     * 获取用户可用余额（考虑订阅）
+     * @param userId 用户ID
+     * @return 可用数量
      */
-    boolean switchResource(Long userId, SwitchResourceRequest request);
+    Integer getAvailableBalance(Long userId);
 
     /**
-     * 同步额度（技术团队回调）
+     * 初始化用户Token账户
+     * @param userId 用户ID
+     * @return 是否成功
      */
-    boolean syncUsage(SyncUsageRequest request);
-
-    /**
-     * 绑定规则成功回调
-     */
-    void onBindSuccess(String apiKey, String tenantId, String baseUrl);
-
-    /**
-     * 获取余额充值记录
-     */
-    List<BalanceRecharge> getRechargeHistory(Long userId);
-
-    /**
-     * 创建余额充值订单
-     */
-    BalanceRecharge createRechargeOrder(Long userId, Double amountCny);
-
-    /**
-     * 充值订单支付成功
-     */
-    boolean onRechargePaid(String orderNo);
-
-    /**
-     * 获取用户订阅详情
-     */
-    UserSubscription getSubscriptionDetail(Long subscriptionId);
+    boolean initUserToken(Long userId);
 }

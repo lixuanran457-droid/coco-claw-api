@@ -1,12 +1,12 @@
 package com.cococlown.cococlawservice.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.cococlown.cococlawservice.entity.UserSubscription;
+import com.cococlown.cococlawservice.entity.UsageRecord;
 import org.apache.ibatis.annotations.Mapper;
 
 /**
- * 用户订阅Mapper
+ * 使用记录Mapper
  */
 @Mapper
-public interface UserSubscriptionMapper extends BaseMapper<UserSubscription> {
+public interface UsageRecordMapper extends BaseMapper<UsageRecord> {
 }

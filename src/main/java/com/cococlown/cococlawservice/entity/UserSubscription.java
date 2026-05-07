@@ -2,9 +2,11 @@ package com.cococlown.cococlawservice.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/**
+ * 用户订阅表
+ */
 @Data
 @TableName("user_subscription")
 public class UserSubscription {
@@ -12,104 +14,45 @@ public class UserSubscription {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    /** 用户ID */
     private Long userId;
 
+    /** 套餐ID */
     private Long packageId;
 
-    private String orderNo;
-
-    /**
-     * 订阅名称（冗余存储）
-     */
-    private String name;
-
-    /**
-     * 规则ID（冗余存储）
-     */
-    private String ruleId;
-
-    /**
-     * 每日额度
-     */
-    private BigDecimal dailyQuota;
-
-    /**
-     * 今日已用
-     */
-    private BigDecimal dailyUsed;
-
-    /**
-     * 今日剩余
-     */
-    private BigDecimal dailyRemain;
-
-    /**
-     * 每日额度重置时间
-     */
-    private LocalDateTime dailyResetAt;
-
-    /**
-     * 总额度
-     */
-    private BigDecimal totalQuota;
-
-    /**
-     * 已用总额度
-     */
-    private BigDecimal totalUsed;
-
-    /**
-     * 剩余总额度
-     */
-    private BigDecimal totalRemain;
-
-    /**
-     * PENDING-待激活 ACTIVE-激活 EXPIRED-过期 DEPLETED-耗尽 DISABLED-禁用
-     */
-    private String status;
-
-    /**
-     * 1-当前使用中 0-未使用
-     */
-    private Integer isCurrent;
-
-    /**
-     * 技术团队租户ID
-     */
-    private String tenantId;
-
-    /**
-     * API Key（技术团队返回）
-     */
-    private String apiKey;
-
-    /**
-     * API 地址
-     */
-    private String baseUrl;
-
-    /**
-     * 开始时间
-     */
-    private LocalDateTime startedAt;
-
-    /**
-     * 过期时间
-     */
-    private LocalDateTime expireAt;
-
-    @TableField(fill = FieldFill.INSERT)
-    private LocalDateTime createdAt;
-
-    @TableField(fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updatedAt;
-
-    @TableLogic
-    private Integer deleted;
-
-    @TableField(exist = false)
+    /** 套餐名称(冗余) */
     private String packageName;
 
-    @TableField(exist = false)
-    private String unit;
+    /** Token配额 */
+    private Integer tokenQuota;
+
+    /** 已使用 */
+    private Integer tokenUsed;
+
+    /** 剩余 */
+    private Integer tokenRemaining;
+
+    /** 开始时间 */
+    private LocalDateTime startTime;
+
+    /** 过期时间 */
+    private LocalDateTime expireTime;
+
+    /** 状态: 0-已过期, 1-生效中 */
+    private Integer status;
+
+    /** 自动续费: 0-否, 1-是 */
+    private Integer autoRenew;
+
+    /** 创建时间 */
+    @TableField(fill = FieldFill.INSERT)
+    private LocalDateTime createTime;
+
+    /** 更新时间 */
+    @TableField(fill = FieldFill.INSERT_UPDATE)
+    private LocalDateTime updateTime;
+
+    /** 逻辑删除: 0-未删除, 1-已删除 */
+    @TableLogic
+    private Integer deleted;
 }
